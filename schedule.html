@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Schedule Manager</title>
+  <!-- Bootstrap 5 -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  />
+  <!-- Vue 3 -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+</head>
+<body>
+  <div id="app" class="container py-5">
+    <h2 class="mb-4">Schedule Manager</h2>
+
+    <!-- Filter Section -->
+    <div class="row mb-4">
+      <div class="col-md-3">
+        <label for="filterDate" class="form-label">Filter by Date</label>
+        <input v-model="filter.date" type="date" id="filterDate" class="form-control" />
+      </div>
+      <div class="col-md-3">
+        <label for="filterPatientId" class="form-label">Filter by Patient ID</label>
+        <select v-model="filter.patientId" id="filterPatientId" class="form-select">
+          <option value="">Select Patient</option>
+          <option v-for="patient in patients" :key="patient.patientId" :value="patient.patientId">{{ patient.patientId }}</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Tab Navigation -->
+    <ul class="nav nav-tabs mb-4">
+      <li class="nav-item">
+        <a class="nav-link" :class="{ active: selectedTab === 'patient' }" href="#" @click="selectedTab = 'patient'">Patient</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" :class="{ active: selectedTab === 'staff' }" href="#" @click="selectedTab = 'staff'">Staff</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" :class="{ active: selectedTab === 'interpreter' }" href="#" @click="selectedTab = 'interpreter'">Interpreter</a>
+      </li>
+    </ul>
+
+    <!-- Add Appointment Button (Placed under Tab Navigation) -->
+    <div class="mb-4 row">
+      <div class="col-md-3 d-grid">
+        <button class="btn btn-primary" @click="showAddAppointment = !showAddAppointment">
+          Add Appointment
+        </button>
+      </div>
+    </div>
+
+    <!-- Add / Edit Form based on Schedule Type (Hidden by Default, Show on Button Click) -->
+    <div v-if="showAddAppointment" class="mb-4">
+      <form @submit.prevent="handleSubmit" class="row g-3">
+        <div class="col-md-3">
+          <input v-model="form.title" v-if="scheduleType === 'patient'" type="text" class="form-control" placeholder="Event Title" required />
+        </div>
+        <div class="col-md-2">
+          <input v-model="form.date" type="date" class="form-control" required />
+        </div>
+        <div class="col-md-2">
+          <input v-model="form.time" type="time" class="form-control" required />
+        </div>
+        <div class="col-md-3">
+          <input v-if="scheduleType === 'patient'" v-model="form.description" type="text" class="form-control" placeholder="Event Description" />
+        </div>
+        <div class="col-md-3">
+          <!-- Patient ID Select Dropdown -->
+          <select v-if="scheduleType === 'patient'" v-model="form.patientId" class="form-select" required>
+            <option disabled value="">Select Patient</option>
+            <option v-for="patient in patients" :key="patient.patientId" :value="patient.patientId">{{ patient.patientId }}</option>
+          </select>
+        </div>
+
+        <!-- Staff Role Selection (Always Required) -->
+        <!-- <div class="col-md-3">
+          <select v-model="form.roles.staff" class="form-select" required>
+            <option disabled value="">Select Staff Role</option>
+            <option value="Doctor">Doctor</option>
+            <option value="Nurse">Nurse</option>
+          </select>
+        </div> -->
+
+        <!-- Interpreter Role Selection (Optional) -->
+        <div class="col-md-3">
+          <label class="form-check-label" for="interpreterCheckbox">Interpreter Required</label>
+          <input
+            id="interpreterCheckbox"
+            v-model="form.roles.interpreter"
+            type="checkbox"
+            class="form-check-input"
+          />
+        </div>
+
+        <div class="col-md-2 d-grid">
+          <button class="btn btn-primary" type="submit">
+            {{ editingIndex !== null ? 'Update' : 'Add' }}
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Patient Schedule View -->
+    <div v-if="selectedTab === 'patient'">
+      <h4>Patient Appointments</h4>
+      <table class="table table-striped table-bordered align-middle">
+        <thead class="table-dark">
+          <tr>
+            <th>Title</th>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Patient ID</th>
+            <th>Interpreter Requested</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(item, index) in filteredSchedule.patient" :key="index">
+            <td>{{ item.title }}</td>
+            <td>{{ item.date }}</td>
+            <td>{{ item.time }}</td>
+            <td>{{ item.patientId }}</td>
+            <td>{{ item.roles.interpreter ? 'YES' : 'NO' }}</td>
+            <td>
+              <button class="btn btn-sm btn-danger" @click="deleteItem(index, 'patient')">
+                Delete
+              </button>
+            </td>
+          </tr>
+          <tr v-if="filteredSchedule.patient.length === 0">
+            <td colspan="6" class="text-center text-muted">No events found for selected filters.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Staff Schedule View -->
+    <div v-if="selectedTab === 'staff'">
+      <h4>Staff Appointments</h4>
+      <table class="table table-striped table-bordered align-middle">
+        <thead class="table-dark">
+          <tr>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Patient ID</th>
+            <th>Staff ID</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(item, index) in filteredSchedule.staff" :key="index">
+            <td>{{ item.date }}</td>
+            <td>{{ item.time }}</td>
+            <td>{{ item.patientId }}</td>
+            <td>
+              <select v-model="item.staffOrInterpreterId" @change="updateStatus(item, 'staff')" class="form-select">
+                <option disabled value="">Select Staff</option>
+                <option v-for="staff in staffMembers" :key="staff.staffId" :value="staff.staffId">{{ staff.staffId }}</option>
+              </select>
+            </td>
+            <td>
+              <span :class="item.status === 'Pending' ? 'text-warning' : 'text-success'">{{ item.status }}</span>
+            </td>
+          </tr>
+          <tr v-if="filteredSchedule.staff.length === 0">
+            <td colspan="5" class="text-center text-muted">No events found for selected filters.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Interpreter Schedule View -->
+    <div v-if="selectedTab === 'interpreter'">
+      <h4>Interpreter Appointments</h4>
+      <table class="table table-striped table-bordered align-middle">
+        <thead class="table-dark">
+          <tr>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Patient ID</th>
+            <th>Interpreter ID</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(item, index) in filteredSchedule.interpreter" :key="index">
+            <td>{{ item.date }}</td>
+            <td>{{ item.time }}</td>
+            <td>{{ item.patientId }}</td>
+            <td>
+              <select v-model="item.staffOrInterpreterId" @change="updateStatus(item, 'interpreter')" class="form-select">
+                <option disabled value="">Select Interpreter</option>
+                <option v-for="interpreter in interpreters" :key="interpreter.interpreterId" :value="interpreter.interpreterId">{{ interpreter.interpreterId }}</option>
+              </select>
+            </td>
+            <td>
+              <span :class="item.status === 'Pending' ? 'text-warning' : 'text-success'">{{ item.status }}</span>
+            </td>
+          </tr>
+          <tr v-if="filteredSchedule.interpreter.length === 0">
+            <td colspan="5" class="text-center text-muted">No events found for selected filters.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Vue Script -->
+  <script>
+    const { createApp, ref, computed } = Vue
+
+    createApp({
+      setup() {
+        // Patient, Staff, and Interpreter datasets
+        const patients = ref([
+          { patientId: 'P123' },
+          { patientId: 'P124' },
+          { patientId: 'P125' }
+        ])
+
+        const staffMembers = ref([
+          { staffId: 'S001' },
+          { staffId: 'S002' }
+        ])
+
+        const interpreters = ref([
+          { interpreterId: 'I001' },
+          { interpreterId: 'I002' }
+        ])
+
+        const schedule = ref({
+          patient: [
+            { title: 'Consultation', date: '2025-04-07', time: '10:00', patientId: 'P123', appointmentId: 'A123', roles: { interpreter: true } },
+            { title: 'Check-up', date: '2025-04-07', time: '14:00', patientId: 'P124', appointmentId: 'A124', roles: { interpreter: false } }
+          ],
+          staff: [
+            { date: '2025-04-07', time: '10:00', patientId: 'P123', staffOrInterpreterId: 'Staff - P123', status: 'Pending', appointmentId: 'A123' },
+            { date: '2025-04-07', time: '14:00', patientId: 'P124', staffOrInterpreterId: 'Staff - P124', status: 'Pending', appointmentId: 'A124' }
+          ],
+          interpreter: [
+            { date: '2025-04-07', time: '10:00', patientId: 'P123', staffOrInterpreterId: 'Interpreter - P123', status: 'Pending', appointmentId: 'A123' }
+          ]
+        })
+
+        const form = ref({ title: '', description: '', date: '', time: '', patientId: '', roles: { staff: true, interpreter: false }, staffOrInterpreterId: '', status: 'Pending', appointmentId: '' })
+        const editingIndex = ref(null)
+        const selectedTab = ref('patient')
+        const scheduleType = ref('patient')
+        const showAddAppointment = ref(false)
+
+        // Filter values
+        const filter = ref({
+          date: '',
+          patientId: ''
+        })
+
+        const resetForm = () => {
+          form.value = { title: '', description: '', date: '', time: '', patientId: '', roles: { staff: true, interpreter: false }, staffOrInterpreterId: '', status: 'Pending', appointmentId: '' }
+          editingIndex.value = null
+        }
+
+        const handleSubmit = () => {
+          const newAppointment = { ...form.value, appointmentId: `A${Date.now()}` }
+
+          // Add the new appointment
+          if (scheduleType.value === 'patient') {
+            schedule.value.patient.push(newAppointment)
+
+            // Add staff and interpreter appointments associated with the patient appointment
+            if (newAppointment.roles.staff) {
+              const staffSchedule = {
+                date: newAppointment.date,
+                time: newAppointment.time,
+                patientId: newAppointment.patientId,
+                staffOrInterpreterId: `Staff - ${newAppointment.patientId}`,
+                status: 'Pending',
+                appointmentId: newAppointment.appointmentId
+              }
+              schedule.value.staff.push(staffSchedule)
+            }
+            if (newAppointment.roles.interpreter) {
+              const interpreterSchedule = {
+                date: newAppointment.date,
+                time: newAppointment.time,
+                patientId: newAppointment.patientId,
+                staffOrInterpreterId: `Interpreter - ${newAppointment.patientId}`,
+                status: 'Pending',
+                appointmentId: newAppointment.appointmentId
+              }
+              schedule.value.interpreter.push(interpreterSchedule)
+            }
+          }
+          resetForm()
+        }
+
+        const deleteItem = (index, category) => {
+          const deletedItem = schedule.value[category].splice(index, 1)[0]
+          
+          // Delete associated staff and interpreter appointments
+          if (category === 'patient') {
+            schedule.value.staff = schedule.value.staff.filter(item => item.appointmentId !== deletedItem.appointmentId)
+            schedule.value.interpreter = schedule.value.interpreter.filter(item => item.appointmentId !== deletedItem.appointmentId)
+          }
+        }
+
+        const updateStatus = (item, category) => {
+          const itemToUpdate = schedule.value[category].find((i) => i.appointmentId === item.appointmentId)
+          if (itemToUpdate) {
+            itemToUpdate.status = 'Confirmed'
+          }
+        }
+
+        // Filtered Schedule based on filters
+        const filteredSchedule = computed(() => {
+          const patientFiltered = schedule.value.patient.filter((item) => {
+            return (!filter.value.date || item.date === filter.value.date) && (!filter.value.patientId || item.patientId === filter.value.patientId)
+          })
+          const staffFiltered = schedule.value.staff.filter((item) => {
+            return (!filter.value.date || item.date === filter.value.date) && (!filter.value.patientId || item.patientId === filter.value.patientId)
+          })
+          const interpreterFiltered = schedule.value.interpreter.filter((item) => {
+            return (!filter.value.date || item.date === filter.value.date) && (!filter.value.patientId || item.patientId === filter.value.patientId)
+          })
+          return {
+            patient: patientFiltered,
+            staff: staffFiltered,
+            interpreter: interpreterFiltered
+          }
+        })
+
+        return {
+          schedule,
+          patients,
+          staffMembers,
+          interpreters,
+          form,
+          filter,
+          showAddAppointment,
+          selectedTab,
+          resetForm,
+          handleSubmit,
+          deleteItem,
+          updateStatus,
+          filteredSchedule,
+          scheduleType,
+          editingIndex
+        }
+      }
+    }).mount('#app')
+  </script>
+</body>
+</html>
