@@ -9,3 +9,10 @@ As a team of young developers, you are asked to develop a comprehensive Manageme
 - Facility management: Residential services are provided at aged care facilities; the facility itself needs management, such as rooms, utilities, reservations, and so on.
 - Scheduling: There are different types of staff to manage aged care services; not all staff are engaged in providing the services actively; however, they could be engaged in maintaining facilities and doing administrative tasks. Their roles as well as the assignment of - services (which could be roaster-based) need to be kept track of.
 - Inventory management: Residential facilities provide daily necessities to the elderly; as such, it is important to keep track of the daily commodities, medication, and other necessary goods.
+
+
+# Members:
+- Flynn Nott
+- Ngoc Tai Le (Tylor)
+- Thanaphon Nitiphityanon
+- Januda Lankeshwara
